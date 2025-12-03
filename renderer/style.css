@@ -440,6 +440,8 @@ body {
   flex-direction: column;
   background: var(--bg-primary);
   position: relative;
+  max-width: calc(100vw - 280px);
+  width: 100%;
 }
 
 .terminal-header {
@@ -720,6 +722,7 @@ body {
   padding: 6px;
   border-radius: 4px;
   transition: all 0.2s;
+  width: fit-content;
 }
 
 .file-actions button:hover {
