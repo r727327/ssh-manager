@@ -1,0 +1,47 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  // Server management
+  getServers: () => ipcRenderer.invoke('get-servers'),
+  addServer: (server) => ipcRenderer.invoke('add-server', server),
+  updateServer: (id, server) => ipcRenderer.invoke('update-server', id, server),
+  deleteServer: (id) => ipcRenderer.invoke('delete-server', id),
+
+  // SSH operations
+  connectSSH: (server) => ipcRenderer.invoke('connect-ssh', server),
+  sendCommand: (serverId, command) => ipcRenderer.invoke('send-command', serverId, command),
+  disconnectSSH: (serverId) => ipcRenderer.invoke('disconnect-ssh', serverId),
+  isConnected: (serverId) => ipcRenderer.invoke('is-connected', serverId),
+
+  // SFTP operations
+  sftpList: (serverId, path) => ipcRenderer.invoke('sftp-list', serverId, path),
+  sftpRead: (serverId, path) => ipcRenderer.invoke('sftp-read', serverId, path),
+  sftpWrite: (serverId, path, content) => ipcRenderer.invoke('sftp-write', serverId, path, content),
+  sftpUpload: (serverId, localPath, remotePath) => ipcRenderer.invoke('sftp-upload', serverId, localPath, remotePath),
+  sftpDownload: (serverId, remotePath, localPath) => ipcRenderer.invoke('sftp-download', serverId, remotePath, localPath),
+  sftpDelete: (serverId, path, isDir) => ipcRenderer.invoke('sftp-delete', serverId, path, isDir),
+  sftpCreateDir: (serverId, path) => ipcRenderer.invoke('sftp-create-dir', serverId, path),
+  sftpCreateFile: (serverId, path) => ipcRenderer.invoke('sftp-create-file', serverId, path),
+  sftpRename: (serverId, oldPath, newPath) => ipcRenderer.invoke('sftp-rename', serverId, oldPath, newPath),
+
+  // Native Dialogs
+  showOpenDialog: () => ipcRenderer.invoke('dialog-show-open'),
+  showSaveDialog: (defaultName) => ipcRenderer.invoke('dialog-show-save', defaultName),
+
+  // Local File System
+  localFsList: (path) => ipcRenderer.invoke('local-fs-list', path),
+  getHomeDir: () => ipcRenderer.invoke('get-home-dir'),
+
+  // Window controls
+  minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
+  maximizeWindow: () => ipcRenderer.invoke('window-maximize'),
+  closeWindow: () => ipcRenderer.invoke('window-close'),
+
+  // Terminal events
+  onTerminalOutput: (callback) => {
+    ipcRenderer.on('terminal-output', (event, serverId, data) => callback(serverId, data));
+  },
+  onTerminalDisconnected: (callback) => {
+    ipcRenderer.on('terminal-disconnected', (event, serverId) => callback(serverId));
+  },
+});
