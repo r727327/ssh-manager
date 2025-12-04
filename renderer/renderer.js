@@ -79,6 +79,8 @@ const fileList = document.getElementById('fileList');
 const breadcrumbs = document.getElementById('breadcrumbs');
 const refreshFilesBtn = document.getElementById('refreshFilesBtn');
 const createFolderBtn = document.getElementById('createFolderBtn');
+const backBtn = document.getElementById('backBtn');
+const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
 const editorContainer = document.getElementById('editorContainer');
 const saveFileBtn = document.getElementById('saveFileBtn');
 const closeEditorBtn = document.getElementById('closeEditorBtn');
@@ -88,6 +90,7 @@ const editorFileName = document.getElementById('editorFileName');
 const localFileList = document.getElementById('localFileList');
 const localBreadcrumbs = document.getElementById('localBreadcrumbs');
 const refreshLocalFilesBtn = document.getElementById('refreshLocalFilesBtn');
+const backLocalBtn = document.getElementById('backLocalBtn');
 const uploadBtn = document.getElementById('uploadBtn');
 
 // Modal DOM Elements
@@ -290,11 +293,14 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // File Actions
 refreshFilesBtn.addEventListener('click', () => loadFileList(currentPath));
 createFolderBtn.addEventListener('click', handleCreateFolder);
+backBtn.addEventListener('click', handleBackButton);
+bulkDeleteBtn.addEventListener('click', handleBulkDelete);
 saveFileBtn.addEventListener('click', saveFileContent);
 closeEditorBtn.addEventListener('click', closeEditor);
 
 // Local File Actions
 refreshLocalFilesBtn.addEventListener('click', () => loadLocalFileList(currentLocalPath));
+backLocalBtn.addEventListener('click', handleBackLocalButton);
 uploadBtn.addEventListener('click', handleDualPaneUpload);
 
 // Close modal on outside click
@@ -650,13 +656,35 @@ function renderFiles(files) {
         <div class="col-date">${date}</div>
         <div class="col-perm">${file.permissions}</div>
         <div class="file-row-actions">
-          ${!file.isDirectory ? `<button onclick="editFile('${safeName}')" title="Edit"><i class="fas fa-edit"></i></button>` : ''}
-          <button onclick="downloadItem('${safeName}')" title="Download"><i class="fas fa-download"></i></button>
-          <button onclick="openDeleteConfirm({name: '${safeName}', isDir: ${file.isDirectory}})" title="Delete"><i class="fas fa-trash"></i></button>
+          ${!file.isDirectory ? `<button class="edit-file-btn" data-filename="${safeName}" title="Edit"><i class="fas fa-edit"></i></button>` : ''}
+          <button class="download-item-btn" data-filename="${safeName}" title="Download"><i class="fas fa-download"></i></button>
+          <button class="delete-item-btn" data-filename="${safeName}" data-isdir="${file.isDirectory}" title="Delete"><i class="fas fa-trash"></i></button>
         </div>
       </div>
     `;
   }).join('');
+
+  // Add event listeners for action buttons using event delegation
+  fileList.querySelectorAll('.edit-file-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editFile(btn.dataset.filename);
+    });
+  });
+
+  fileList.querySelectorAll('.download-item-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      downloadItem(btn.dataset.filename);
+    });
+  });
+
+  fileList.querySelectorAll('.delete-item-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDeleteConfirm({ name: btn.dataset.filename, isDir: btn.dataset.isdir === 'true' });
+    });
+  });
 }
 
 function getFileIcon(filename) {
@@ -874,9 +902,9 @@ function renderLocalFiles(files) {
     <div class="file-row"
          data-name="${safeName}"
          data-isdir="${file.isDirectory}"
-         onclick="toggleLocalSelection('${safeName}')"
+         ondblclick="handleLocalFileDoubleClick('${safeName}', ${file.isDirectory})"
          oncontextmenu="handleLocalContextMenu(event, '${safeName}', ${file.isDirectory})">
-      <input type="checkbox" class="local-select-checkbox" data-name="${safeName}" />
+      <input type="checkbox" class="local-select-checkbox" data-name="${safeName}" onclick="event.stopPropagation()" />
       <div class="col-name">
         <i class="fas ${icon} ${file.isDirectory ? 'folder-icon' : 'file-icon'}"></i>
         ${file.name}
@@ -887,11 +915,6 @@ function renderLocalFiles(files) {
   `;
   }).join('');
 }
-
-window.toggleLocalSelection = (name) => {
-  const checkbox = document.querySelector(`.local-select-checkbox[data-name='${name}']`);
-  if (checkbox) checkbox.checked = !checkbox.checked;
-};
 
 window.handleLocalFileDoubleClick = (name, isDir) => {
   if (isDir) {
@@ -1055,6 +1078,79 @@ async function handleCreateFile() {
   } else {
     alert(`Error creating file: ${result.message}`);
   }
+}
+
+// Back Button Handlers
+function handleBackButton() {
+  if (!currentServer || currentPath === '/') return;
+
+  // Navigate to parent directory
+  const parts = currentPath.split('/').filter(p => p);
+  parts.pop(); // Remove last part
+  const parentPath = parts.length === 0 ? '/' : '/' + parts.join('/');
+  loadFileList(parentPath);
+}
+
+function handleBackLocalButton() {
+  if (!currentLocalPath || currentLocalPath === '/') return;
+
+  // Navigate to parent directory
+  const parts = currentLocalPath.split('/').filter(p => p);
+  parts.pop(); // Remove last part
+  const parentPath = parts.length === 0 ? '/' : '/' + parts.join('/');
+  loadLocalFileList(parentPath);
+}
+
+// Bulk Delete Handler
+async function handleBulkDelete() {
+  if (!currentServer) return;
+
+  const checkboxes = document.querySelectorAll('.remote-select-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('Please select at least one file or folder to delete.');
+    return;
+  }
+
+  const itemNames = Array.from(checkboxes).map(cb => cb.dataset.name);
+  const confirmMsg = `Are you sure you want to delete ${itemNames.length} item(s)?\n\n${itemNames.join('\n')}`;
+
+  if (!confirm(confirmMsg)) return;
+
+  bulkDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+  bulkDeleteBtn.disabled = true;
+
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const cb of checkboxes) {
+    const name = cb.dataset.name;
+    const isDir = cb.closest('.file-row').dataset.isdir === 'true';
+    const path = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+
+    try {
+      const result = await window.electronAPI.sftpDelete(currentServer.id, path, isDir);
+      if (result.success) {
+        successCount++;
+      } else {
+        errorCount++;
+        console.error(`Failed to delete ${name}: ${result.message}`);
+      }
+    } catch (e) {
+      errorCount++;
+      console.error(`Error deleting ${name}:`, e);
+    }
+  }
+
+  bulkDeleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Selected';
+  bulkDeleteBtn.disabled = false;
+
+  if (errorCount > 0) {
+    alert(`Deleted ${successCount} item(s). ${errorCount} item(s) failed.`);
+  } else {
+    alert(`Successfully deleted ${successCount} item(s).`);
+  }
+
+  loadFileList(currentPath);
 }
 
 // Initialize

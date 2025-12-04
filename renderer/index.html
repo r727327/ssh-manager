@@ -87,9 +87,11 @@
               <input type="text" id="remotePathInput" class="path-input" placeholder="/remote/path">
               <input type="text" id="remoteSearchInput" class="search-input" placeholder="Search...">
               <div class="file-actions">
+                <button id="backBtn" title="Go to Parent Folder"><i class="fas fa-arrow-up"></i></button>
                 <button id="refreshFilesBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
                 <button id="createFolderBtn" title="New Folder"><i class="fas fa-folder-plus"></i></button>
                 <button id="createFileBtn" title="New File"><i class="fas fa-plus"></i></button>
+                <button id="bulkDeleteBtn" title="Delete Selected" class="btn-danger-outline"><i class="fas fa-trash"></i> Delete Selected</button>
               </div>
             </div>
             <div class="file-list-header">
@@ -108,6 +110,7 @@
               <input type="text" id="localPathInput" class="path-input" placeholder="/local/path">
               <input type="text" id="localSearchInput" class="search-input" placeholder="Search...">
               <div class="file-actions">
+                <button id="backLocalBtn" title="Go to Parent Folder"><i class="fas fa-arrow-up"></i></button>
                 <button id="refreshLocalFilesBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
                 <button id="uploadBtn" title="Upload to Remote"><i class="fas fa-arrow-left"></i> Upload</button>
               </div>
