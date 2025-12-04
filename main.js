@@ -21,7 +21,7 @@ function createWindow() {
   });
 
   win.loadFile('renderer/index.html');
-  win.webContents.openDevTools();
+  // win.webContents.openDevTools();
 
   // Window control handlers
   ipcMain.handle('window-minimize', () => win.minimize());
@@ -185,6 +185,20 @@ ipcMain.handle('send-command', async (event, serverId, command) => {
   }
 });
 
+// Raw terminal input for xterm
+ipcMain.handle('terminal-input', async (event, serverId, data) => {
+  const session = sshSessions.get(serverId);
+  if (!session || !session.shell) {
+    return { success: false, message: 'Not connected' };
+  }
+  try {
+    session.shell.write(data);
+    return { success: true };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+});
+
 ipcMain.handle('disconnect-ssh', async (event, serverId) => {
   const session = sshSessions.get(serverId);
   if (session) {
@@ -289,6 +303,30 @@ ipcMain.handle('sftp-upload', async (event, serverId, localPath, remotePath) => 
   try {
     await session.ssh.putFile(localPath, remotePath);
     return { success: true };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+});
+
+// Recursive folder upload handler
+ipcMain.handle('sftp-upload-folder', async (event, serverId, localDir, remoteDir) => {
+  const session = sshSessions.get(serverId);
+  if (!session || !session.ssh) return { success: false, message: 'Not connected' };
+
+  try {
+    // node-ssh provides putDirectory for recursive upload
+    const result = await session.ssh.putDirectory(localDir, remoteDir, {
+      recursive: true,
+      concurrency: 5,
+      tick: (localPath, remotePath, error) => {
+        // optional: could report progress via IPC if needed
+      }
+    });
+    if (result) {
+      return { success: true };
+    } else {
+      return { success: false, message: 'Upload failed (putDirectory returned false)' };
+    }
   } catch (err) {
     return { success: false, message: err.message };
   }

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // SSH operations
   connectSSH: (server) => ipcRenderer.invoke('connect-ssh', server),
   sendCommand: (serverId, command) => ipcRenderer.invoke('send-command', serverId, command),
+  sendTerminalInput: (serverId, data) => ipcRenderer.invoke('terminal-input', serverId, data),
   disconnectSSH: (serverId) => ipcRenderer.invoke('disconnect-ssh', serverId),
   isConnected: (serverId) => ipcRenderer.invoke('is-connected', serverId),
 
@@ -18,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sftpRead: (serverId, path) => ipcRenderer.invoke('sftp-read', serverId, path),
   sftpWrite: (serverId, path, content) => ipcRenderer.invoke('sftp-write', serverId, path, content),
   sftpUpload: (serverId, localPath, remotePath) => ipcRenderer.invoke('sftp-upload', serverId, localPath, remotePath),
+  sftpUploadFolder: (serverId, localDir, remoteDir) => ipcRenderer.invoke('sftp-upload-folder', serverId, localDir, remoteDir),
   sftpDownload: (serverId, remotePath, localPath) => ipcRenderer.invoke('sftp-download', serverId, remotePath, localPath),
   sftpDelete: (serverId, path, isDir) => ipcRenderer.invoke('sftp-delete', serverId, path, isDir),
   sftpCreateDir: (serverId, path) => ipcRenderer.invoke('sftp-create-dir', serverId, path),

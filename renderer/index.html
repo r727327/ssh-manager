@@ -83,7 +83,9 @@
           <div class="file-panel" id="remoteFilePanel">
             <div class="panel-header">Remote Files</div>
             <div class="file-explorer-toolbar">
-              <div class="breadcrumbs" id="breadcrumbs"></div>
+              <div class="breadcrumbs" id="breadcrumbs" style="display:none;"></div>
+              <input type="text" id="remotePathInput" class="path-input" placeholder="/remote/path">
+              <input type="text" id="remoteSearchInput" class="search-input" placeholder="Search...">
               <div class="file-actions">
                 <button id="refreshFilesBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
                 <button id="createFolderBtn" title="New Folder"><i class="fas fa-folder-plus"></i></button>
@@ -102,7 +104,9 @@
           <div class="file-panel" id="localFilePanel">
             <div class="panel-header">Local Files</div>
             <div class="file-explorer-toolbar">
-              <div class="breadcrumbs" id="localBreadcrumbs"></div>
+              <div class="breadcrumbs" id="localBreadcrumbs" style="display:none;"></div>
+              <input type="text" id="localPathInput" class="path-input" placeholder="/local/path">
+              <input type="text" id="localSearchInput" class="search-input" placeholder="Search...">
               <div class="file-actions">
                 <button id="refreshLocalFilesBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
                 <button id="uploadBtn" title="Upload to Remote"><i class="fas fa-arrow-left"></i> Upload</button>
@@ -140,6 +144,7 @@
     <div class="menu-item" id="ctxEdit"><i class="fas fa-edit"></i> Edit</div>
     <div class="menu-item" id="ctxRename"><i class="fas fa-i-cursor"></i> Rename</div>
     <div class="menu-item" id="ctxDownload"><i class="fas fa-download"></i> Download</div>
+    <div class="menu-item" id="ctxUpload"><i class="fas fa-upload"></i> Upload</div>
     <div class="menu-item" id="ctxDelete" class="danger"><i class="fas fa-trash"></i> Delete</div>
   </div>
 
@@ -243,6 +248,26 @@
       <div class="modal-actions">
         <button class="btn-secondary" id="cancelDeleteBtn">Cancel</button>
         <button class="btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt Modal -->
+  <div id="promptModal" class="modal">
+    <div class="modal-content small-modal">
+      <div class="modal-header">
+        <h2 id="promptTitle">Input</h2>
+        <button class="modal-close" id="closePromptModal"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label id="promptMessage" for="promptInput">Enter value</label>
+          <input type="text" id="promptInput" class="full-width">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="cancelPromptBtn">Cancel</button>
+        <button class="btn-primary" id="confirmPromptBtn">OK</button>
       </div>
     </div>
   </div>

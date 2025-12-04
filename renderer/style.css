@@ -564,6 +564,7 @@ body {
   padding: 16px 24px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
+  display: none; /* Hide old input area */
 }
 
 #commandInput {
@@ -597,6 +598,34 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+}
+
+.path-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Consolas', monospace;
+}
+
+.search-input {
+  width: 150px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.path-input:focus,
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
 }
 
 .breadcrumbs {
@@ -738,8 +767,8 @@ body {
 
 .file-row {
   display: grid;
-  grid-template-columns: 3fr 1fr 1.5fr 1fr 100px;
-  padding: 10px 24px;
+  grid-template-columns: 30px 3fr 1fr 1.5fr 1fr 100px; /* Added checkbox column */
+  padding: 10px 12px; /* Reduced padding */
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 14px;
   color: var(--text-primary);

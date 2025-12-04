@@ -101,6 +101,55 @@ const confirmRenameBtn = document.getElementById('confirmRenameBtn');
 const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
 const closeDeleteModal = document.getElementById('closeDeleteModal');
 const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+const remotePathInput = document.getElementById('remotePathInput');
+const remoteSearchInput = document.getElementById('remoteSearchInput');
+const localPathInput = document.getElementById('localPathInput');
+const localSearchInput = document.getElementById('localSearchInput');
+const ctxUpload = document.getElementById('ctxUpload');
+const ctxDownload = document.getElementById('ctxDownload');
+
+// Prompt Modal Elements
+const promptModal = document.getElementById('promptModal');
+const promptTitle = document.getElementById('promptTitle');
+const promptMessage = document.getElementById('promptMessage');
+const promptInput = document.getElementById('promptInput');
+const confirmPromptBtn = document.getElementById('confirmPromptBtn');
+const cancelPromptBtn = document.getElementById('cancelPromptBtn');
+const closePromptBtn = document.getElementById('closePromptModal');
+
+let promptResolve = null;
+
+let remoteSearchQuery = '';
+let localSearchQuery = '';
+let contextMenuSource = 'remote'; // 'remote' or 'local'
+
+// Prompt Modal Logic
+function showPrompt(title, message, defaultValue = '') {
+  promptTitle.textContent = title;
+  promptMessage.textContent = message;
+  promptInput.value = defaultValue;
+  promptModal.classList.add('show');
+  promptInput.focus();
+
+  return new Promise((resolve) => {
+    promptResolve = resolve;
+  });
+}
+
+function closePrompt(value) {
+  promptModal.classList.remove('show');
+  if (promptResolve) {
+    promptResolve(value);
+    promptResolve = null;
+  }
+}
+
+confirmPromptBtn.addEventListener('click', () => closePrompt(promptInput.value));
+cancelPromptBtn.addEventListener('click', () => closePrompt(null));
+closePromptBtn.addEventListener('click', () => closePrompt(null));
+promptInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') closePrompt(promptInput.value);
+});
 
 // Initialize
 loadServers();
@@ -125,7 +174,8 @@ addServerBtn.addEventListener('click', openAddModal);
 closeModal.addEventListener('click', closeModalHandler);
 cancelBtn.addEventListener('click', closeModalHandler);
 serverForm.addEventListener('submit', handleFormSubmit);
-commandInput.addEventListener('keypress', handleCommandInput);
+// Remove HTML command input handling; use xterm for command input
+// commandInput.addEventListener('keypress', handleCommandInput);
 disconnectBtn.addEventListener('click', handleDisconnect);
 authTypeSelect.addEventListener('change', handleAuthTypeChange);
 
@@ -148,7 +198,63 @@ document.getElementById('ctxDownload').addEventListener('click', () => {
 
 document.getElementById('ctxDelete').addEventListener('click', () => {
   contextMenu.classList.remove('show');
-  if (contextMenuTarget) openDeleteConfirm(contextMenuTarget);
+  if (contextMenuTarget) {
+    if (contextMenuSource === 'remote') {
+      openDeleteConfirm(contextMenuTarget);
+    } else {
+      // Local delete not fully implemented with modal yet, but we can add it or just confirm
+      if (confirm(`Are you sure you want to delete ${contextMenuTarget.name}?`)) {
+        // Implement local delete if needed, or reuse modal
+        // For now let's just alert or skip
+        alert('Local delete not implemented in this step');
+      }
+    }
+  }
+});
+
+ctxUpload.addEventListener('click', async () => {
+  contextMenu.classList.remove('show');
+  if (contextMenuTarget && contextMenuSource === 'local') {
+    const name = contextMenuTarget.name;
+    const isDir = contextMenuTarget.isDir;
+    const localPath = `${currentLocalPath}/${name}`;
+    const remotePath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+
+    try {
+      if (isDir) {
+        const result = await window.electronAPI.sftpUploadFolder(currentServer.id, localPath, remotePath);
+        if (result.success) { alert('Folder uploaded'); loadFileList(currentPath); }
+        else alert(`Upload failed: ${result.message}`);
+      } else {
+        const result = await window.electronAPI.sftpUpload(currentServer.id, localPath, remotePath);
+        if (result.success) { alert('File uploaded'); loadFileList(currentPath); }
+        else alert(`Upload failed: ${result.message}`);
+      }
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+    }
+  }
+});
+
+// Path Inputs
+remotePathInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') loadFileList(remotePathInput.value);
+});
+localPathInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') loadLocalFileList(localPathInput.value);
+});
+
+// Search Inputs
+remoteSearchInput.addEventListener('input', (e) => {
+  remoteSearchQuery = e.target.value.toLowerCase();
+  // We need to re-render with current files. 
+  // But we don't have them stored globally except in the DOM or we need to refetch?
+  // Better to store currentFileList
+  if (currentRemoteFiles) renderFiles(currentRemoteFiles);
+});
+localSearchInput.addEventListener('input', (e) => {
+  localSearchQuery = e.target.value.toLowerCase();
+  if (currentLocalFiles) renderLocalFiles(currentLocalFiles);
 });
 
 // Rename Modal
@@ -415,8 +521,9 @@ async function connectToServer(serverId) {
 
   if (result.success) {
     currentServer = server;
-    commandInput.disabled = false;
-    commandInput.focus();
+    // commandInput.disabled = false; // Deprecated
+    // commandInput.focus(); // Deprecated
+    terminal.focus();
     disconnectBtn.style.display = 'flex';
     mainTabs.style.display = 'flex';
 
@@ -459,15 +566,15 @@ async function handleDisconnect() {
   renderServerList();
 }
 
-async function handleCommandInput(e) {
-  if (e.key === 'Enter' && currentServer) {
-    const command = commandInput.value.trim();
-    if (!command) return;
-
-    await window.electronAPI.sendCommand(currentServer.id, command);
-    commandInput.value = '';
+// Capture command input from the xterm terminal
+// Capture command input from the xterm terminal
+terminal.onData(data => {
+  if (currentServer) {
+    window.electronAPI.sendTerminalInput(currentServer.id, data);
   }
-}
+});
+// Remove custom key handler as we are using raw input now
+// terminal.attachCustomKeyEventHandler...
 
 // File System Functions
 async function loadFileList(path) {
@@ -479,7 +586,8 @@ async function loadFileList(path) {
 
   if (result.success) {
     currentPath = path;
-    renderBreadcrumbs(path);
+    remotePathInput.value = path;
+    currentRemoteFiles = result.files; // Store for filtering
     renderFiles(result.files);
   } else {
     fileList.innerHTML = `<div class="error-msg">Error: ${result.message}</div>`;
@@ -505,21 +613,23 @@ function renderBreadcrumbs(path) {
   breadcrumbs.innerHTML = html;
 }
 
+let currentRemoteFiles = [];
 function renderFiles(files) {
+  const filtered = files.filter(f => f.name.toLowerCase().includes(remoteSearchQuery));
   // Sort: Directories first, then files
-  files.sort((a, b) => {
+  filtered.sort((a, b) => {
     if (a.isDirectory === b.isDirectory) {
       return a.name.localeCompare(b.name);
     }
     return a.isDirectory ? -1 : 1;
   });
 
-  if (files.length === 0) {
-    fileList.innerHTML = '<div class="empty-folder">Empty folder</div>';
+  if (filtered.length === 0) {
+    fileList.innerHTML = '<div class="empty-folder">No matches found</div>';
     return;
   }
 
-  fileList.innerHTML = files.map(file => {
+  fileList.innerHTML = filtered.map(file => {
     const icon = file.isDirectory ? 'fa-folder' : getFileIcon(file.name);
     const size = file.isDirectory ? '-' : formatSize(file.size);
     const date = new Date(file.modifyTime).toLocaleString();
@@ -527,8 +637,11 @@ function renderFiles(files) {
     const safeName = escapeQuote(file.name);
     return `
       <div class="file-row" 
+           data-name="${safeName}"
+           data-isdir="${file.isDirectory}"
            ondblclick="handleFileDoubleClick('${safeName}', ${file.isDirectory})"
            oncontextmenu="handleContextMenu(event, '${safeName}', ${file.isDirectory})">
+        <input type="checkbox" class="remote-select-checkbox" data-name="${safeName}" onclick="event.stopPropagation()" />
         <div class="col-name">
           <i class="fas ${icon} ${file.isDirectory ? 'folder-icon' : 'file-icon'}"></i>
           ${file.name}
@@ -603,6 +716,25 @@ window.handleContextMenu = (e, name, isDir) => {
   } else {
     editOption.style.display = 'flex';
   }
+
+  contextMenuSource = 'remote';
+  ctxUpload.style.display = 'none';
+  ctxDownload.style.display = 'flex';
+
+  contextMenu.style.top = `${e.clientY}px`;
+  contextMenu.style.left = `${e.clientX}px`;
+  contextMenu.classList.add('show');
+};
+
+window.handleLocalContextMenu = (e, name, isDir) => {
+  e.preventDefault();
+  contextMenuTarget = { name, isDir };
+  contextMenuSource = 'local';
+
+  // Show Upload, Hide Download/Edit (Edit is for remote)
+  document.getElementById('ctxEdit').style.display = 'none';
+  ctxDownload.style.display = 'none';
+  ctxUpload.style.display = 'flex';
 
   contextMenu.style.top = `${e.clientY}px`;
   contextMenu.style.left = `${e.clientX}px`;
@@ -688,7 +820,8 @@ async function loadLocalFileList(path) {
 
     if (result.success) {
       currentLocalPath = path;
-      renderLocalBreadcrumbs(path);
+      localPathInput.value = path;
+      currentLocalFiles = result.files;
       renderLocalFiles(result.files);
     } else {
       console.error('Error loading local files:', result.message);
@@ -719,45 +852,45 @@ function renderLocalBreadcrumbs(path) {
   localBreadcrumbs.innerHTML = html;
 }
 
+let currentLocalFiles = [];
 function renderLocalFiles(files) {
-  files.sort((a, b) => {
+  const filtered = files.filter(f => f.name.toLowerCase().includes(localSearchQuery));
+  filtered.sort((a, b) => {
     if (a.isDirectory === b.isDirectory) return a.name.localeCompare(b.name);
     return a.isDirectory ? -1 : 1;
   });
 
-  if (files.length === 0) {
-    localFileList.innerHTML = '<div class="empty-folder">Empty folder</div>';
+  if (filtered.length === 0) {
+    localFileList.innerHTML = '<div class="empty-folder">No matches found</div>';
     return;
   }
 
-  localFileList.innerHTML = files.map(file => {
+  localFileList.innerHTML = filtered.map(file => {
     const icon = file.isDirectory ? 'fa-folder' : getFileIcon(file.name);
     const size = file.isDirectory ? '-' : formatSize(file.size);
     const date = new Date(file.modifyTime).toLocaleString();
-    const isSelected = selectedLocalFile === file.name ? 'selected' : '';
-
     const safeName = escapeQuote(file.name);
     return `
-      <div class="file-row ${isSelected}" 
-           onclick="selectLocalFile('${safeName}')"
-           ondblclick="handleLocalFileDoubleClick('${safeName}', ${file.isDirectory})">
-        <div class="col-name">
-          <i class="fas ${icon} ${file.isDirectory ? 'folder-icon' : 'file-icon'}"></i>
-          ${file.name}
-        </div>
-        <div class="col-size">${size}</div>
-        <div class="col-date">${date}</div>
+    <div class="file-row"
+         data-name="${safeName}"
+         data-isdir="${file.isDirectory}"
+         onclick="toggleLocalSelection('${safeName}')"
+         oncontextmenu="handleLocalContextMenu(event, '${safeName}', ${file.isDirectory})">
+      <input type="checkbox" class="local-select-checkbox" data-name="${safeName}" />
+      <div class="col-name">
+        <i class="fas ${icon} ${file.isDirectory ? 'folder-icon' : 'file-icon'}"></i>
+        ${file.name}
       </div>
-    `;
+      <div class="col-size">${size}</div>
+      <div class="col-date">${date}</div>
+    </div>
+  `;
   }).join('');
 }
 
-window.selectLocalFile = (name) => {
-  selectedLocalFile = name;
-  // Re-render to show selection (simplified)
-  const rows = localFileList.querySelectorAll('.file-row');
-  rows.forEach(row => row.classList.remove('selected'));
-  event.currentTarget.classList.add('selected');
+window.toggleLocalSelection = (name) => {
+  const checkbox = document.querySelector(`.local-select-checkbox[data-name='${name}']`);
+  if (checkbox) checkbox.checked = !checkbox.checked;
 };
 
 window.handleLocalFileDoubleClick = (name, isDir) => {
@@ -769,25 +902,39 @@ window.handleLocalFileDoubleClick = (name, isDir) => {
 
 // Dual Pane Transfer Logic
 async function handleDualPaneUpload() {
-  if (!currentServer || !selectedLocalFile) {
-    alert('Please select a local file to upload.');
+  if (!currentServer) {
+    alert('Please connect to a server first.');
+    return;
+  }
+  // Gather selected local items
+  const checkboxes = document.querySelectorAll('.local-select-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('Please select at least one local file or folder to upload.');
     return;
   }
 
-  const localPath = `${currentLocalPath}/${selectedLocalFile}`;
-  const remotePath = currentPath === '/' ? `/${selectedLocalFile}` : `${currentPath}/${selectedLocalFile}`;
-
   uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-
-  const result = await window.electronAPI.sftpUpload(currentServer.id, localPath, remotePath);
-
-  uploadBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Upload';
-
-  if (result.success) {
-    loadFileList(currentPath); // Refresh remote list
-  } else {
-    alert(`Upload failed: ${result.message}`);
+  let anyError = false;
+  for (const cb of checkboxes) {
+    const name = cb.dataset.name;
+    const isDir = cb.closest('.file-row').dataset.isdir === 'true';
+    const localPath = `${currentLocalPath}/${name}`;
+    const remotePath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+    try {
+      if (isDir) {
+        const result = await window.electronAPI.sftpUploadFolder(currentServer.id, localPath, remotePath);
+        if (!result.success) { anyError = true; alert(`Folder upload failed for ${name}: ${result.message}`); }
+      } else {
+        const result = await window.electronAPI.sftpUpload(currentServer.id, localPath, remotePath);
+        if (!result.success) { anyError = true; alert(`File upload failed for ${name}: ${result.message}`); }
+      }
+    } catch (e) {
+      anyError = true;
+      alert(`Error uploading ${name}: ${e.message}`);
+    }
   }
+  uploadBtn.innerHTML = '<i class="fas fa-arrow-left"></i> Upload';
+  if (!anyError) loadFileList(currentPath);
 }
 
 // File Operations
@@ -859,7 +1006,7 @@ async function handleRename() {
 }
 
 async function handleCreateFolder() {
-  const name = prompt('Enter folder name:');
+  const name = await showPrompt('New Folder', 'Enter folder name:');
   if (!name) return;
 
   // Fix path construction logic
@@ -893,7 +1040,7 @@ async function handleUploadFile() {
 }
 
 async function handleCreateFile() {
-  const name = prompt('Enter file name:');
+  const name = await showPrompt('New File', 'Enter file name:');
   if (!name) return;
 
   const path = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;

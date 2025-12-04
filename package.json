@@ -1,21 +1,49 @@
 {
   "name": "ssh-manager",
   "version": "1.0.0",
-  "description": "",
+  "description": "A modern SSH manager with terminal and SFTP support.",
+  "author": {
+    "name": "Ravi Singh",
+    "email": "singhravi22@yahoo.com"
+  },
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.sshmanager.app",
+    "productName": "SSH Manager",
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "icon": "icon",
+      "desktop": {
+        "Name": "SSH Manager",
+        "Comment": "Manage SSH servers and file transfers",
+        "Icon": "ssh-manager"
+      }
+    },
+    "directories": {
+      "output": "dist"
+    }
   },
   "keywords": [],
-  "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
-    "electron": "^39.2.4",
     "electron-store": "^10.0.0",
     "node-ssh": "^13.2.1"
+  },
+  "devDependencies": {
+    "electron": "^39.2.4",
+    "electron-builder": "^24.13.3"
   }
 }
