@@ -305,7 +305,6 @@ body {
 }
 
 .btn-primary {
-  width: 100%;
   padding: 12px 20px;
   background: var(--accent-gradient);
   color: white;
@@ -964,7 +963,7 @@ canvas.xterm-selection-layer {
 }
 
 .modal-header {
-  padding: 24px;
+  padding: 10px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
@@ -1046,8 +1045,7 @@ canvas.xterm-selection-layer {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  margin-top: 24px;
-  padding-top: 24px;
+  padding: 10px;
   border-top: 1px solid var(--border-color);
 }
 

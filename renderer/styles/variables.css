@@ -1,0 +1,19 @@
+/* CSS Custom Properties / Variables */
+
+:root {
+    --bg-primary: #0f0f23;
+    --bg-secondary: #1a1a2e;
+    --bg-tertiary: #16213e;
+    --accent-primary: #00d9ff;
+    --accent-secondary: #7b2cbf;
+    --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --text-primary: #e4e4e7;
+    --text-secondary: #a1a1aa;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
