@@ -1,40 +1,59 @@
 # SSH Manager
 
-SSH Manager is a cross-platform desktop application built with **Electron** and **Node.js** that allows you to manage SSH connections, access terminal sessions, and transfer files via SFTP. It is designed for developers and sysadmins who want a simple and powerful SSH client with built-in file management capabilities.
+A modern, cross-platform SSH client built with **Electron** and **Node.js**. Manage SSH connections, execute commands in a full-featured terminal, and transfer files with an intuitive dual-pane SFTP interface.
 
 ---
 
-## Features
+## ✨ Features
 
-- **SSH Terminal**
-  - Connect to servers via password or private key.
-  - Send commands and receive real-time output.
-  - Terminal disconnect detection.
+### 🖥️ Terminal
+- **Full xterm.js Integration** - Native terminal emulation with complete ANSI support
+- **Interactive Shell** - Arrow keys, tab completion, and all terminal features work natively
+- **Connection Health Monitoring** - Keep-alive packets prevent idle disconnections
+- **Auto-Reconnect** - Automatic reconnection with exponential backoff on connection loss
+- **High Performance** - Buffered output handling for smooth rendering of large outputs
 
-- **SFTP / File Operations**
-  - Browse remote directories.
-  - Read and edit files (up to 5MB).
-  - Upload/download files.
-  - Create, delete, and rename files or directories.
-  
-- **Server Management**
-  - Add, update, delete server entries.
-  - Store server info locally using `electron-store`.
+### 📁 SFTP / File Management
+- **Dual-Pane Interface** - FileZilla-style layout with local and remote file browsers
+- **Multi-Select Operations** - Select multiple files/folders for bulk operations
+- **File Operations**
+  - Upload/download files and folders (with recursive support)
+  - Create, delete, rename files and directories
+  - Edit remote files with Monaco Editor (syntax highlighting)
+  - View file permissions and metadata
+- **Navigation**
+  - Breadcrumb navigation
+  - Direct path input
+  - Search/filter files
+  - Parent directory navigation
+- **Context Menu** - Right-click for quick actions (upload, download, rename, delete, edit)
 
-- **Local File System**
-  - Browse local directories and files.
-  - Display file metadata (size, permissions, modification date).
+### 🔐 Authentication
+- **Password Authentication** - Standard username/password login
+- **SSH Key Authentication** - Support for private keys with optional passphrase
+- **Secure Storage** - Credentials stored locally using electron-store
 
-- **Window & UI Controls**
-  - Frameless window with custom minimize, maximize, close.
-  - Terminal output and disconnect events.
+### 💾 Server Management
+- **Save Multiple Servers** - Store unlimited server configurations
+- **Quick Connect** - One-click connection to saved servers
+- **Edit/Delete** - Manage server entries easily
+- **Connection Status** - Visual indicators for connection state
 
-- **Native Dialogs**
-  - Open file and save file dialogs.
+### 🎨 User Interface
+- **Modern Design** - Clean, dark-themed interface with smooth animations
+- **Frameless Window** - Custom title bar with minimize, maximize, close controls
+- **Collapsible Sidebar** - Maximize workspace when needed
+- **Tab Interface** - Switch between Terminal and Files views
+- **Responsive Layout** - Adapts to window resizing
 
 ---
 
-## Installation
+## 🚀 Installation
+
+### Prerequisites
+- Node.js 16+ and npm
+
+### Setup
 
 1. **Clone the repository**
 ```bash
@@ -54,45 +73,87 @@ npm start
 
 ---
 
-## Usage
+## 📖 Usage
 
-1. Open the application.
-2. Add a server with hostname, port, username, and authentication method (password or private key).
-3. Connect to the server:
-   - Terminal tab for executing commands.
-   - SFTP tab for managing files.
-4. Use native dialogs to open or save local files.
-5. Disconnect SSH sessions safely when done.
+### Adding a Server
+1. Click **"Add Server"** in the sidebar
+2. Enter server details:
+   - Server name (for easy identification)
+   - Host (IP address or domain)
+   - Port (default: 22)
+   - Username
+   - Authentication method (password or SSH key)
+3. Click **"Save"**
 
----
+### Connecting
+1. Click on a server in the sidebar
+2. Wait for connection confirmation
+3. Use the **Terminal** tab for command execution
+4. Use the **Files** tab for file management
 
-## Roadmap
+### Terminal Operations
+- Type commands directly in the terminal
+- Use arrow keys for command history
+- Press Ctrl+C to interrupt running commands
+- Terminal supports all standard features (vim, nano, top, etc.)
 
-Planned features include:
-- Full terminal emulation using `xterm.js`.
-- Multiple terminal/SFTP tabs.
-- Drag-and-drop file uploads/downloads.
-- Large file support with streaming.
-- Bookmark/favorites for servers.
-- Directory synchronization and remote search.
-
----
-
-## Security
-
-- Store passwords/private keys securely (OS keychain/encryption recommended).
-- Sanitize paths for file operations.
-- Optional logging for audit purposes.
-- Keep SSH sessions alive and properly closed on exit.
-
----
-
-## Contributing
-
-Contributions are welcome! Feel free to submit issues, feature requests, or pull requests.
+### File Operations
+- **Upload**: Select local files → right-click → Upload
+- **Download**: Select remote files → click Download button or right-click → Download
+- **Edit**: Double-click a file or right-click → Edit
+- **Bulk Delete**: Select multiple items → click "Delete Selected"
+- **Navigate**: Double-click folders or use breadcrumbs/path input
 
 ---
 
-## License
+## 🛠️ Technical Stack
+
+- **Electron** - Cross-platform desktop framework
+- **Node.js** - Runtime environment
+- **node-ssh** - SSH2 client for Node.js
+- **xterm.js** - Terminal emulator
+- **Monaco Editor** - Code editor (VS Code's editor)
+- **electron-store** - Persistent storage
+
+---
+
+## 🔒 Security Considerations
+
+- Credentials are stored locally using electron-store
+- SSH connections use standard SSH2 protocol
+- Private keys can be password-protected
+- **Recommendation**: Use SSH keys instead of passwords for better security
+- **Future**: OS keychain integration for encrypted credential storage
+
+---
+
+## 🐛 Known Limitations
+
+- File editor limited to 5MB files (for performance)
+- Maximum 100 queued commands (prevents memory issues)
+- SFTP operations may fail during reconnection (retry after reconnect)
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to:
+- Report bugs via GitHub Issues
+- Suggest features
+- Submit pull requests
+
+---
+
+## 📄 License
 
 MIT License © 2025 Ravi Singh
+
+---
+
+## 🙏 Acknowledgments
+
+Built with:
+- [xterm.js](https://xtermjs.org/) - Terminal emulator
+- [Monaco Editor](https://microsoft.github.io/monaco-editor/) - Code editor
+- [node-ssh](https://github.com/steelbrain/node-ssh) - SSH client
+- [Electron](https://www.electronjs.org/) - Desktop framework

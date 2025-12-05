@@ -46,4 +46,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onTerminalDisconnected: (callback) => {
     ipcRenderer.on('terminal-disconnected', (event, serverId) => callback(serverId));
   },
+  onTerminalReconnecting: (callback) => {
+    ipcRenderer.on('terminal-reconnecting', (event, serverId, attempt, maxRetries) => callback(serverId, attempt, maxRetries));
+  },
+  onTerminalReconnected: (callback) => {
+    ipcRenderer.on('terminal-reconnected', (event, serverId) => callback(serverId));
+  },
+  onTerminalReconnectFailed: (callback) => {
+    ipcRenderer.on('terminal-reconnect-failed', (event, serverId) => callback(serverId));
+  },
+  onQueueStatus: (callback) => {
+    ipcRenderer.on('queue-status', (event, serverId, queueLength) => callback(serverId, queueLength));
+  },
+
+  // Reconnection management
+  setReconnectPreference: (serverId, enabled, retries) => ipcRenderer.invoke('set-reconnect-preference', serverId, enabled, retries),
+  manualReconnect: (serverId) => ipcRenderer.invoke('manual-reconnect', serverId),
+  getQueueStatus: (serverId) => ipcRenderer.invoke('get-queue-status', serverId),
 });

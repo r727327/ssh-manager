@@ -8,6 +8,7 @@ const terminal = new Terminal({
   cursorBlink: true,
   fontSize: 14,
   fontFamily: 'Consolas, Monaco, monospace',
+  letterSpacing: 0, // Critical: Ensure no letter spacing
   theme: {
     background: '#000000',
     foreground: '#00ff00',
@@ -316,7 +317,7 @@ deleteConfirmModal.addEventListener('click', (e) => {
   if (e.target === deleteConfirmModal) deleteConfirmModal.classList.remove('show');
 });
 
-// Terminal output handler
+// Terminal output handler - server-side buffering is sufficient
 window.electronAPI.onTerminalOutput((serverId, data) => {
   if (currentServer && currentServer.id === serverId) {
     terminal.write(data);
@@ -326,8 +327,47 @@ window.electronAPI.onTerminalOutput((serverId, data) => {
 // Terminal disconnection handler
 window.electronAPI.onTerminalDisconnected((serverId) => {
   if (currentServer && currentServer.id === serverId) {
-    terminal.writeln('\r\n\x1b[31mConnection closed\x1b[0m\r\n');
-    handleDisconnect();
+    terminal.writeln('\r\n\x1b[31m━━━ Connection closed ━━━\x1b[0m\r\n');
+    terminal.writeln('\x1b[33mAttempting to reconnect...\x1b[0m\r\n');
+
+    // Update connection status
+    connectionText.textContent = `Disconnected from ${currentServer.name}`;
+    document.querySelector('.status-dot').classList.remove('connected');
+    document.querySelector('.status-dot').classList.add('disconnected');
+  }
+});
+
+// Reconnection attempt handler
+window.electronAPI.onTerminalReconnecting((serverId, attempt, maxRetries) => {
+  if (currentServer && currentServer.id === serverId) {
+    terminal.writeln(`\x1b[33mReconnection attempt ${attempt}/${maxRetries}...\x1b[0m\r\n`);
+    connectionText.textContent = `Reconnecting to ${currentServer.name} (${attempt}/${maxRetries})`;
+  }
+});
+
+// Reconnection success handler
+window.electronAPI.onTerminalReconnected((serverId) => {
+  if (currentServer && currentServer.id === serverId) {
+    terminal.writeln('\r\n\x1b[32m━━━ Reconnected successfully! ━━━\x1b[0m\r\n');
+
+    // Update connection status
+    connectionText.textContent = `Connected to ${currentServer.name}`;
+    document.querySelector('.status-dot').classList.remove('disconnected');
+    document.querySelector('.status-dot').classList.add('connected');
+
+    // Re-establish connection in our state
+    connectToServer(serverId);
+  }
+});
+
+// Reconnection failed handler
+window.electronAPI.onTerminalReconnectFailed((serverId) => {
+  if (currentServer && currentServer.id === serverId) {
+    terminal.writeln('\r\n\x1b[31m━━━ Reconnection failed ━━━\x1b[0m\r\n');
+    terminal.writeln('\x1b[36mClick "Reconnect" button to try again\x1b[0m\r\n');
+
+    // Show reconnect button
+    showReconnectButton();
   }
 });
 
@@ -1178,7 +1218,73 @@ terminal.writeln('\x1b[36m╔═════════════════
 terminal.writeln('\x1b[36m║                                                       ║\x1b[0m');
 terminal.writeln('\x1b[36m║              Welcome to SSH Manager                   ║\x1b[0m');
 terminal.writeln('\x1b[36m║                                                       ║\x1b[0m');
-terminal.writeln('\x1b[36m║  Select a server from the sidebar to get started     ║\x1b[0m');
+terminal.writeln('\x1b[36m║  Select a server from the sidebar to get started      ║\x1b[0m');
 terminal.writeln('\x1b[36m║                                                       ║\x1b[0m');
 terminal.writeln('\x1b[36m╚═══════════════════════════════════════════════════════╝\x1b[0m');
 terminal.writeln('');
+
+// Helper Functions for Reconnection and Queue Status
+
+function showReconnectButton() {
+  // Check if reconnect button already exists
+  let reconnectBtn = document.getElementById('reconnectBtn');
+
+  if (!reconnectBtn) {
+    reconnectBtn = document.createElement('button');
+    reconnectBtn.id = 'reconnectBtn';
+    reconnectBtn.className = 'btn btn-primary';
+    reconnectBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Reconnect';
+    reconnectBtn.style.marginLeft = '10px';
+
+    reconnectBtn.addEventListener('click', async () => {
+      if (currentServer) {
+        terminal.writeln('\x1b[36mManually reconnecting...\\x1b[0m\r\n');
+        const result = await window.electronAPI.manualReconnect(currentServer.id);
+
+        if (result.success) {
+          // Connection successful, remove button
+          reconnectBtn.remove();
+        } else {
+          terminal.writeln(`\x1b[31mReconnection failed: ${result.message}\\x1b[0m\r\n`);
+        }
+      }
+    });
+
+    // Add button next to disconnect button
+    disconnectBtn.parentElement.appendChild(reconnectBtn);
+  }
+}
+
+function hideReconnectButton() {
+  const reconnectBtn = document.getElementById('reconnectBtn');
+  if (reconnectBtn) {
+    reconnectBtn.remove();
+  }
+}
+
+// Enhanced disconnect handler
+async function handleDisconnect() {
+  if (!currentServer) return;
+
+  // Hide reconnect button if visible
+  hideReconnectButton();
+
+  await window.electronAPI.disconnectSSH(currentServer.id);
+
+  currentServer = null;
+  commandInput.disabled = true;
+  commandInput.value = '';
+  disconnectBtn.style.display = 'none';
+  mainTabs.style.display = 'none';
+
+  // Reset view to terminal
+  document.querySelector('.tab-btn[data-tab="terminal"]').click();
+
+  // Update connection info
+  connectionText.textContent = 'Not Connected';
+  document.querySelector('.status-dot').classList.remove('connected');
+  document.querySelector('.status-dot').classList.add('disconnected');
+
+  terminal.writeln('\r\n\x1b[33mDisconnected\x1b[0m\r\n');
+  renderServerList();
+}

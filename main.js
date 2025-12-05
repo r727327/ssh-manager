@@ -6,6 +6,13 @@ const Store = require('electron-store').default || require('electron-store');
 const store = new Store();
 const sshSessions = new Map(); // Store active SSH sessions by server ID
 
+// Configuration constants
+const OUTPUT_BUFFER_SIZE = 64 * 1024; // 64KB chunks
+const MAX_COMMAND_QUEUE = 100; // Maximum queued commands
+const KEEPALIVE_INTERVAL = 30000; // 30 seconds
+const RECONNECT_MAX_RETRIES = 3;
+const RECONNECT_BACKOFF_BASE = 1000; // 1 second base delay
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
@@ -95,6 +102,87 @@ ipcMain.handle('delete-server', async (event, id) => {
   return true;
 });
 
+// Reconnection handler
+async function attemptReconnect(event, server, oldSessionState) {
+  const retryAttempt = oldSessionState.reconnectAttempts + 1;
+  const backoffDelay = RECONNECT_BACKOFF_BASE * Math.pow(2, retryAttempt - 1);
+
+  event.sender.send('terminal-reconnecting', server.id, retryAttempt, server.reconnectRetries || RECONNECT_MAX_RETRIES);
+
+  setTimeout(async () => {
+    try {
+      // Manually trigger connection
+      const ssh = new NodeSSH();
+      const config = {
+        host: server.host,
+        username: server.username,
+        port: server.port || 22,
+      };
+
+      if (server.authType === 'key' && server.privateKey) {
+        if (!server.privateKey.includes('BEGIN') && require('fs').existsSync(server.privateKey)) {
+          config.privateKey = require('fs').readFileSync(server.privateKey, 'utf8');
+        } else {
+          config.privateKey = server.privateKey;
+        }
+        if (server.passphrase) {
+          config.passphrase = server.passphrase;
+        }
+      } else if (server.password) {
+        config.password = server.password;
+      }
+
+      config.keepaliveInterval = server.keepAliveInterval || KEEPALIVE_INTERVAL;
+      config.keepaliveCountMax = 3;
+
+      await ssh.connect(config);
+
+      // Successfully reconnected - clean up old session and create new one
+      sshSessions.delete(server.id);
+
+      // Trigger a new connection via the handler
+      const result = { success: true };
+      event.sender.send('terminal-reconnected', server.id);
+
+      // Close this temporary connection and let the main handler take over
+      ssh.dispose();
+
+    } catch (err) {
+      oldSessionState.reconnectAttempts = retryAttempt;
+      if (retryAttempt < (server.reconnectRetries || RECONNECT_MAX_RETRIES)) {
+        attemptReconnect(event, server, oldSessionState);
+      } else {
+        event.sender.send('terminal-reconnect-failed', server.id);
+        sshSessions.delete(server.id);
+      }
+    }
+  }, backoffDelay);
+}
+
+// Process command queue
+async function processCommandQueue(serverId) {
+  const session = sshSessions.get(serverId);
+  if (!session || session.isProcessingQueue || session.commandQueue.length === 0) {
+    return;
+  }
+
+  session.isProcessingQueue = true;
+
+  while (session.commandQueue.length > 0) {
+    const command = session.commandQueue.shift();
+    try {
+      session.shell.write(command);
+      session.lastActivity = Date.now();
+      // Small delay to prevent overwhelming the shell
+      await new Promise(resolve => setTimeout(resolve, 10));
+    } catch (err) {
+      console.error(`Error writing command to shell:`, err);
+    }
+  }
+
+  session.isProcessingQueue = false;
+}
+
 // SSH connection management
 ipcMain.handle('connect-ssh', async (event, server) => {
   try {
@@ -135,6 +223,10 @@ ipcMain.handle('connect-ssh', async (event, server) => {
       config.password = server.password;
     }
 
+    // Configure keep-alive
+    config.keepaliveInterval = server.keepAliveInterval || KEEPALIVE_INTERVAL;
+    config.keepaliveCountMax = 3;
+
     await ssh.connect(config);
 
     // Create shell session
@@ -143,26 +235,80 @@ ipcMain.handle('connect-ssh', async (event, server) => {
     // Create SFTP session
     const sftp = await ssh.requestSFTP();
 
-    // Store session
-    sshSessions.set(server.id, {
+    // Initialize session state
+    const sessionState = {
       ssh,
       shell,
       sftp,
       server,
-    });
+      outputBuffer: '',
+      outputTimer: null,
+      commandQueue: [],
+      isProcessingQueue: false,
+      connectionState: 'connected',
+      reconnectAttempts: 0,
+      lastActivity: Date.now()
+    };
 
-    // Handle shell output
-    shell.on('data', (data) => {
-      event.sender.send('terminal-output', server.id, data.toString());
-    });
+    // Store session
+    sshSessions.set(server.id, sessionState);
 
+    // Buffered output handler - send RAW output without any normalization
+    const flushOutputBuffer = () => {
+      if (sessionState.outputBuffer.length > 0) {
+        // Send raw output directly - DO NOT normalize or modify
+        event.sender.send('terminal-output', server.id, sessionState.outputBuffer);
+        sessionState.outputBuffer = '';
+      }
+      sessionState.outputTimer = null;
+    };
+
+    const handleOutput = (data) => {
+      sessionState.lastActivity = Date.now();
+      sessionState.outputBuffer += data.toString();
+
+      // Flush if buffer exceeds size limit
+      if (sessionState.outputBuffer.length >= OUTPUT_BUFFER_SIZE) {
+        if (sessionState.outputTimer) {
+          clearTimeout(sessionState.outputTimer);
+        }
+        flushOutputBuffer();
+      } else {
+        // Debounce output for small chunks
+        if (sessionState.outputTimer) {
+          clearTimeout(sessionState.outputTimer);
+        }
+        sessionState.outputTimer = setTimeout(flushOutputBuffer, 16); // ~60fps
+      }
+    };
+
+    // Handle shell output with buffering
+    shell.on('data', handleOutput);
+    shell.stderr.on('data', handleOutput);
+
+    // Handle disconnection
     shell.on('close', () => {
+      if (sessionState.outputTimer) {
+        clearTimeout(sessionState.outputTimer);
+        flushOutputBuffer();
+      }
+
+      sessionState.connectionState = 'disconnected';
       event.sender.send('terminal-disconnected', server.id);
-      sshSessions.delete(server.id);
+
+      // Check if auto-reconnect is enabled
+      const autoReconnect = server.autoReconnect || false;
+      if (autoReconnect && sessionState.reconnectAttempts < (server.reconnectRetries || RECONNECT_MAX_RETRIES)) {
+        attemptReconnect(event, server, sessionState);
+      } else {
+        sshSessions.delete(server.id);
+      }
     });
 
-    shell.stderr.on('data', (data) => {
-      event.sender.send('terminal-output', server.id, data.toString());
+    // Connection error handler
+    shell.on('error', (err) => {
+      console.error(`Shell error for ${server.id}:`, err);
+      handleOutput(`\r\n\x1b[31mConnection error: ${err.message}\x1b[0m\r\n`);
     });
 
     return { success: true, message: 'Connected successfully' };
@@ -185,14 +331,19 @@ ipcMain.handle('send-command', async (event, serverId, command) => {
   }
 });
 
-// Raw terminal input for xterm
+// Raw terminal input - pass directly to shell (no queueing for interactive input)
 ipcMain.handle('terminal-input', async (event, serverId, data) => {
   const session = sshSessions.get(serverId);
   if (!session || !session.shell) {
     return { success: false, message: 'Not connected' };
   }
+
   try {
+    // Pass input directly to shell for interactive terminal
+    // This allows arrow keys, tab completion, and other terminal features to work
     session.shell.write(data);
+    session.lastActivity = Date.now();
+
     return { success: true };
   } catch (err) {
     return { success: false, message: err.message };
@@ -202,6 +353,14 @@ ipcMain.handle('terminal-input', async (event, serverId, data) => {
 ipcMain.handle('disconnect-ssh', async (event, serverId) => {
   const session = sshSessions.get(serverId);
   if (session) {
+    // Clear any pending timers
+    if (session.outputTimer) {
+      clearTimeout(session.outputTimer);
+    }
+
+    // Clear command queue
+    session.commandQueue = [];
+
     if (session.ssh) {
       session.ssh.dispose();
     }
@@ -212,6 +371,47 @@ ipcMain.handle('disconnect-ssh', async (event, serverId) => {
 
 ipcMain.handle('is-connected', async (event, serverId) => {
   return sshSessions.has(serverId);
+});
+
+// Reconnection preference management
+ipcMain.handle('set-reconnect-preference', async (event, serverId, enabled, retries) => {
+  const servers = store.get('servers', []);
+  const index = servers.findIndex(s => s.id === serverId);
+  if (index !== -1) {
+    servers[index].autoReconnect = enabled;
+    if (retries !== undefined) {
+      servers[index].reconnectRetries = retries;
+    }
+    store.set('servers', servers);
+    return { success: true };
+  }
+  return { success: false, message: 'Server not found' };
+});
+
+// Manual reconnection trigger
+ipcMain.handle('manual-reconnect', async (event, serverId) => {
+  const servers = store.get('servers', []);
+  const server = servers.find(s => s.id === serverId);
+  if (!server) {
+    return { success: false, message: 'Server not found' };
+  }
+
+  // Attempt to reconnect
+  return await ipcMain.invoke('connect-ssh', event, server);
+});
+
+// Get queue status
+ipcMain.handle('get-queue-status', async (event, serverId) => {
+  const session = sshSessions.get(serverId);
+  if (!session) {
+    return { success: false, message: 'Not connected' };
+  }
+  return {
+    success: true,
+    queueLength: session.commandQueue.length,
+    isProcessing: session.isProcessingQueue,
+    maxQueueSize: MAX_COMMAND_QUEUE
+  };
 });
 
 // SFTP Operations

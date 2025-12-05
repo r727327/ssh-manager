@@ -560,11 +560,38 @@ body {
   overflow: hidden;
 }
 
+/* Critical: Ensure xterm.js has proper monospace rendering */
+/* Maximum specificity to override any inherited styles */
+#terminal,
+#terminal *,
+#terminal .xterm,
+#terminal .xterm *,
+.xterm,
+.xterm *,
+.xterm-screen,
+.xterm-screen *,
+.xterm-rows,
+.xterm-rows *,
+.xterm-viewport,
+.xterm-viewport *,
+div.xterm,
+div.xterm *,
+canvas.xterm-cursor-layer,
+canvas.xterm-text-layer,
+canvas.xterm-link-layer,
+canvas.xterm-selection-layer {
+  letter-spacing: 0 !important;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  word-spacing: normal !important;
+}
+
+
 .terminal-input-area {
   padding: 16px 24px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
-  display: none; /* Hide old input area */
+  display: none;
+  /* Hide old input area */
 }
 
 #commandInput {
@@ -767,8 +794,10 @@ body {
 
 .file-row {
   display: grid;
-  grid-template-columns: 30px 3fr 1fr 1.5fr 1fr 100px; /* Added checkbox column */
-  padding: 10px 12px; /* Reduced padding */
+  grid-template-columns: 30px 3fr 1fr 1.5fr 1fr 100px;
+  /* Added checkbox column */
+  padding: 10px 12px;
+  /* Reduced padding */
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 14px;
   color: var(--text-primary);
