@@ -91,12 +91,6 @@ npm start
 3. Use the **Terminal** tab for command execution
 4. Use the **Files** tab for file management
 
-### Terminal Operations
-- Type commands directly in the terminal
-- Use arrow keys for command history
-- Press Ctrl+C to interrupt running commands
-- Terminal supports all standard features (vim, nano, top, etc.)
-
 ### File Operations
 - **Upload**: Select local files → right-click → Upload
 - **Download**: Select remote files → click Download button or right-click → Download
@@ -110,28 +104,48 @@ npm start
 
 - **Electron** - Cross-platform desktop framework
 - **Node.js** - Runtime environment
-- **node-ssh** - SSH2 client for Node.js
+- **ssh2** - Pure JavaScript SSH2 client
 - **xterm.js** - Terminal emulator
 - **Monaco Editor** - Code editor (VS Code's editor)
 - **electron-store** - Persistent storage
 
 ---
 
-## 🔒 Security Considerations
+## 🏗️ Project Architecture
+
+The project follows a **modular architecture** for better maintainability and scalability:
+
+### Directory Structure
+
+```
+├── main.js                 # Electron Main Process (Backend)
+├── handlers/               # IPC Handlers for Main Process
+│   ├── server-handler.js   # Server CRUD logic
+│   ├── ssh-handler.js      # SSH connection logic
+│   ├── sftp-handler.js     # File transfer logic
+│   └── window-handler.js   # Window management logic
+└── renderer/               # Renderer Process (Frontend)
+    ├── renderer.js         # Main Entry Point (Modular)
+    ├── modules/            # Functional Modules
+    │   ├── state.js        # Centralized App State
+    │   ├── terminal.js     # Terminal Logic
+    │   ├── server-manager.js # Server UI & Logic
+    │   ├── file-explorer.js  # Remote File Browser
+    │   ├── local-files.js    # Local File Browser
+    │   ├── ui-controls.js    # UI Interaction
+    │   ├── editor.js         # Monaco Editor Integration
+    │   └── modals.js         # Modal Dialogs
+    └── styles/             # Application Styles
+```
+
+---
+
+## � Security Considerations
 
 - Credentials are stored locally using electron-store
 - SSH connections use standard SSH2 protocol
 - Private keys can be password-protected
 - **Recommendation**: Use SSH keys instead of passwords for better security
-- **Future**: OS keychain integration for encrypted credential storage
-
----
-
-## 🐛 Known Limitations
-
-- File editor limited to 5MB files (for performance)
-- Maximum 100 queued commands (prevents memory issues)
-- SFTP operations may fail during reconnection (retry after reconnect)
 
 ---
 
@@ -153,7 +167,7 @@ MIT License © 2025 Ravi Singh
 ## 🙏 Acknowledgments
 
 Built with:
-- [xterm.js](https://xtermjs.org/) - Terminal emulator
-- [Monaco Editor](https://microsoft.github.io/monaco-editor/) - Code editor
-- [node-ssh](https://github.com/steelbrain/node-ssh) - SSH client
-- [Electron](https://www.electronjs.org/) - Desktop framework
+- [xterm.js](https://xtermjs.org/)
+- [Monaco Editor](https://microsoft.github.io/monaco-editor/)
+- [ssh2](https://github.com/mscdex/ssh2)
+- [Electron](https://www.electronjs.org/)

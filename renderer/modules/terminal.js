@@ -2,24 +2,31 @@
 
 import { state } from './state.js';
 
-// Initialize terminal
-const terminal = new Terminal({
-    cursorBlink: true,
-    fontSize: 14,
-    fontFamily: 'Consolas, Monaco, monospace',
-    letterSpacing: 0,
-    theme: {
-        background: '#000000',
-        foreground: '#00ff00',
-        cursor: '#00ff00',
-        selection: 'rgba(255, 255, 255, 0.3)',
-    },
-});
-
-const fitAddon = new FitAddon();
+// Terminal and FitAddon are loaded via CDN in index.html
+// Access them from the global window object
+let terminal;
+let fitAddon;
 let commandInput;
 
 export function initTerminal() {
+    // Initialize terminal from global scope
+    const { Terminal } = window;
+    const { FitAddon } = window.FitAddon;
+
+    terminal = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: 'Consolas, Monaco, monospace',
+        letterSpacing: 0,
+        theme: {
+            background: '#000000',
+            foreground: '#00ff00',
+            cursor: '#00ff00',
+            selection: 'rgba(255, 255, 255, 0.3)',
+        },
+    });
+
+    fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.open(document.getElementById('terminal'));
     fitAddon.fit();
@@ -40,7 +47,14 @@ export function initTerminal() {
         }
     });
 
-    // Handle command input
+    // Capture terminal input and send to SSH
+    terminal.onData(data => {
+        if (state.currentServer) {
+            window.electronAPI.sendTerminalInput(state.currentServer.id, data);
+        }
+    });
+
+    // Handle command input (legacy support)
     if (commandInput) {
         commandInput.addEventListener('keypress', async (e) => {
             if (e.key === 'Enter' && state.currentServer) {
@@ -92,15 +106,15 @@ export function setupTerminalHandlers() {
 }
 
 export function clearTerminal() {
-    terminal.clear();
+    if (terminal) terminal.clear();
 }
 
 export function writeToTerminal(text) {
-    terminal.write(text);
+    if (terminal) terminal.write(text);
 }
 
 export function fitTerminal() {
-    fitAddon.fit();
+    if (fitAddon) fitAddon.fit();
 }
 
 export function enableCommandInput() {

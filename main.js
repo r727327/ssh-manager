@@ -15,6 +15,7 @@ const sshSessions = new Map(); // Shared state for active SSH sessions
 let mainWindow;
 
 function createWindow() {
+  console.log('[Main] Creating window...');
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -29,13 +30,28 @@ function createWindow() {
   });
 
   mainWindow.loadFile('renderer/index.html');
-  // mainWindow.webContents.openDevTools();
+  //mainWindow.webContents.openDevTools(); // Open DevTools to see console errors
+
+  mainWindow.on('closed', () => {
+    console.log('[Main] Window closed');
+    mainWindow = null;
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('[Main] Failed to load:', errorCode, errorDescription);
+  });
+
+  mainWindow.webContents.on('crashed', () => {
+    console.error('[Main] Renderer process crashed!');
+  });
 
   // Register all handlers
   registerWindowHandlers(mainWindow);
   registerServerHandlers(store, sshSessions);
   registerSSHHandlers(sshSessions);
   registerSFTPHandlers(sshSessions);
+
+  console.log('[Main] Window created successfully');
 }
 
 app.whenReady().then(createWindow);

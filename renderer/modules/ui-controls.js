@@ -1,6 +1,7 @@
 // UI Controls Module - Window controls, modals, tabs, sidebar
 
 import { state } from './state.js';
+import { fitTerminal } from './terminal.js';
 
 export function initWindowControls() {
     const minBtn = document.getElementById('minBtn');
@@ -18,6 +19,11 @@ export function initSidebar() {
 
     toggleSidebarBtn?.addEventListener('click', () => {
         sidebar?.classList.toggle('collapsed');
+        // Fit terminal after sidebar animation
+        setTimeout(() => {
+            fitTerminal();
+            if (state.editor) state.editor.layout();
+        }, 300);
     });
 }
 
@@ -39,10 +45,14 @@ export function initTabs() {
                 terminalView.style.display = 'flex';
                 filesView.style.display = 'none';
                 // Fit terminal when switching to it
-                if (window.fitTerminal) window.fitTerminal();
+                fitTerminal();
             } else {
                 terminalView.style.display = 'none';
                 filesView.style.display = 'flex';
+                // Load file list if connected
+                if (state.currentServer && window.loadFileList) {
+                    window.loadFileList(state.currentPath);
+                }
             }
         });
     });
